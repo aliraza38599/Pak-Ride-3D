@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Pak Ride 3D</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#83d0ff;font-family:Arial}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:10px;left:12px;color:#fff;text-shadow:2px 2px 4px #000;font-weight:800;z-index:5}
+#title{font-size:27px}.small{font-size:16px}
+#mode{position:fixed;top:12px;right:12px;background:#0009;color:#fff;padding:8px 12px;border-radius:12px;z-index:5;font-weight:bold}
+#controls{position:fixed;left:0;right:0;bottom:16px;display:flex;justify-content:space-between;padding:0 20px;z-index:5}
+.btn{width:76px;height:76px;border-radius:50%;border:3px solid #fff;background:#111c;color:#fff;font-size:30px}
+#boost,#enter{position:fixed;right:24px;bottom:112px;width:100px;height:58px;border-radius:15px;border:3px solid #fff;background:#e82028;color:#fff;font-weight:900;z-index:5}
+#enter{right:24px;bottom:182px;background:#1477d4}
+#start{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:10}
+#start button{padding:17px 28px;border:0;border-radius:15px;font-size:21px;font-weight:900}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div id="title">🇵🇰 Pak Ride 3D</div><div class="small">Speed: <span id="speed">0</span> km/h</div><div class="small">Distance: <span id="dist">0</span> m</div></div>
+<div id="mode">WALK</div>
+<button id="enter">ENTER BIKE</button><button id="boost">BOOST</button>
+<div id="controls"><button class="btn" id="left">◀</button><button class="btn" id="right">▶</button></div>
+<div id="start"><button>START PAK RIDE 🏍️</button></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x83d0ff);scene.fog=new THREE.Fog(0x83d0ff,35,230);
+const camera=new THREE.PerspectiveCamera(67,innerWidth/innerHeight,.1,350);
+const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+scene.add(new THREE.HemisphereLight(0xffffff,0x4b654b,2.1));
+const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(10,20,8);scene.add(sun);
+const M=c=>new THREE.MeshStandardMaterial({color:c});
+
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,420),M(0x3b9a45));ground.rotation.x=-Math.PI/2;ground.position.z=-170;scene.add(ground);
+const road=new THREE.Mesh(new THREE.PlaneGeometry(15,420),M(0x303238));road.rotation.x=-Math.PI/2;road.position.y=.01;road.position.z=-170;scene.add(road);
+for(let z=10;z>-380;z-=9){let l=new THREE.Mesh(new THREE.PlaneGeometry(.18,4.5),new THREE.MeshBasicMaterial({color:0xffffff}));l.rotation.x=-Math.PI/2;l.position.set(0,.025,z);scene.add(l)}
+
+function box(s,p,c,parent=scene){let o=new THREE.Mesh(new THREE.BoxGeometry(...s),M(c));o.position.set(...p);parent.add(o);return o}
+function makeBuilding(x,z,h,w,d,c){
+ let g=new THREE.Group();box([w,h,d],[x,h/2,z],c,g);
+ for(let yy=1.1;yy<h-.3;yy+=1.2)for(let xx=-w/2+.55;xx<w/2-.2;xx+=1.0)box([.35,.45,.04],[xx,yy,-d/2-.025],0x9bd5ff,g);
+ scene.add(g);
+}
+for(let i=0;i<20;i++){let z=-10-i*18;makeBuilding(-13,z,3+Math.random()*5,5,6,[0xe6d3aa,0xd9e0e5,0xf0c36b,0xb8c7d9][i%4]);makeBuilding(13,z-7,3+Math.random()*6,5,6,[0xd6b58d,0xc7d6e2,0xe4c3c3][i%3])}
+
+const trees=[];
+function tree(x,z){let g=new THREE.Group();let tr=new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,1.8,8),M(0x704214));tr.position.y=.9;g.add(tr);let cr=new THREE.Mesh(new THREE.SphereGeometry(1.05,10,10),M(0x16822c));cr.position.y=2.05;g.add(cr);g.position.set(x,0,z);scene.add(g);trees.push(g)}
+for(let i=0;i<50;i++)tree(i%2?9:-9,-i*8-10);
+
+function makeBike(){
+ const g=new THREE.Group(),red=M(0xd71920),dark=M(0x111111),metal=M(0xbfc5c9),skin=M(0xc88c61);
+ function cyl(r,d,p,ma){let q=new THREE.Mesh(new THREE.CylinderGeometry(r,r,d,20),ma);q.rotation.x=Math.PI/2;q.position.set(...p);g.add(q)}
+ cyl(.38,.18,[0,.43,-.85],dark);cyl(.38,.18,[0,.43,.85],dark);
+ cyl(.13,.2,[0,.43,-.85],metal);cyl(.13,.2,[0,.43,.85],metal);
+ let tank=new THREE.Mesh(new THREE.SphereGeometry(.55,18,12),red);tank.scale.set(.95,.58,1.25);tank.position.set(0,1.02,0);g.add(tank);
+ box([.15,.15,1.55],[0,.72,0],0xbfc5c9,g);box([.6,.17,.8],[0,1.34,.42],0x111111,g);
+ box([.11,.11,.95],[0,1.06,-.7],0xbfc5c9,g);box([1.05,.1,.1],[0,1.56,-1.02],0x111111,g);
+ let lamp=new THREE.Mesh(new THREE.SphereGeometry(.18,14,10),M(0xffffbb));lamp.position.set(0,1.46,-1.04);g.add(lamp);
+ let torso=box([.42,.62,.35],[0,1.72,.3],0x17202a,g);torso.rotation.x=-.3;
+ let head=new THREE.Mesh(new THREE.SphereGeometry(.21,14,10),skin);head.position.set(0,2.15,-.05);g.add(head);
+ return g;
+}
+const bike=makeBike();bike.position.set(0,0,2.8);scene.add(bike);
+
+function makePerson(){
+ const g=new THREE.Group(),skin=M(0xc88c61),shirt=M(0x1681d8),pants=M(0x20242b);
+ let body=box([.55,.9,.35],[0,1.25,0],0x1681d8,g);body.material=shirt;
+ let head=new THREE.Mesh(new THREE.SphereGeometry(.25,14,10),skin);head.position.set(0,1.9,0);g.add(head);
+ for(const x of [-.28,.28])box([.13,.75,.13],[x,.95,0],0x20242b,g);
+ for(const x of [-.34,.34]){let a=box([.13,.65,.13],[x,1.35,-.08],0xc88c61,g);a.rotation.z=x>0?-.25:.25}
+ return g;
+}
+const person=makePerson();person.position.set(0,0,2.8);person.visible=true;scene.add(person);
+
+const traffic=[];
+function car(z,x){
+ let g=new THREE.Group(),c=[0xe53935,0x1565c0,0xf5f5f5,0xffc107][Math.floor(Math.random()*4)];
+ box([1.8,.75,3],[0,.5,0],c,g);box([1.35,.5,1.4],[0,1.0,.15],c,g);g.position.set(x,0,z);scene.add(g);traffic.push(g)
+}
+for(let i=0;i<14;i++)car(-25-i*20,[-4,-2,2,4][i%4]);
+
+let mode='walk',started=false,speed=0,dist=0,keys={left:false,right:false,boost:false};
+function bind(id,k){let e=document.getElementById(id);['pointerdown','touchstart'].forEach(v=>e.addEventListener(v,()=>keys[k]=true,{passive:true}));['pointerup','pointercancel','pointerleave','touchend'].forEach(v=>e.addEventListener(v,()=>keys[k]=false,{passive:true}))}
+bind('left','left');bind('right','right');bind('boost','boost');
+document.getElementById('start').onclick=()=>{started=true;document.getElementById('start').style.display='none'};
+document.getElementById('enter').onclick=()=>{
+ mode=mode==='walk'?'bike':'walk';document.getElementById('mode').textContent=mode.toUpperCase();
+ bike.visible=mode==='bike';person.visible=mode==='walk';
+ if(mode==='bike')person.position.set(0,-10,0);else person.position.copy(bike.position);
+};
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;if(e.key==='ArrowRight'||e.key==='d')keys.right=true});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;if(e.key==='ArrowRight'||e.key==='d')keys.right=false});
+
+let last=performance.now();
+function loop(t){
+ let dt=Math.min((t-last)/16.67,2);last=t;
+ if(started){
+  if(mode==='bike'){
+   let target=keys.boost?2.6:1.25;speed+=(target-speed)*.06;
+   if(keys.left)bike.position.x-=.12*dt;if(keys.right)bike.position.x+=.12*dt;
+   bike.position.x=Math.max(-5.2,Math.min(5.2,bike.position.x));dist+=speed*dt;
+   traffic.forEach(c=>{c.position.z+=speed*dt;if(c.position.z>10){c.position.z=-240-Math.random()*70;c.position.x=[-4,-2,2,4][Math.floor(Math.random()*4)]}});
+   trees.forEach(x=>{x.position.z+=speed*dt;if(x.position.z>15)x.position.z-=430});
+  }else{
+   speed=0;
+   let walk=.08*dt;if(keys.left)person.position.x-=walk;if(keys.right)person.position.x+=walk;
+   person.position.x=Math.max(-6,Math.min(6,person.position.x));
+   person.position.z-=.05*dt;
+   if(person.position.z<-8)person.position.z=3;
+  }
+ }
+ const target=mode==='bike'?new THREE.Vector3(bike.position.x*.3,1.2,-12):new THREE.Vector3(person.position.x*.2,1.5,-10);
+ camera.position.x+=(target.x-camera.position.x)*.08;camera.position.y+=(3.6-camera.position.y)*.08;camera.lookAt(target);
+ document.getElementById('speed').textContent=Math.round(speed*70);document.getElementById('dist').textContent=Math.floor(dist);
+ renderer.render(scene,camera);requestAnimationFrame(loop)
+}
+requestAnimationFrame(loop);
+</script>
+</body></html>
